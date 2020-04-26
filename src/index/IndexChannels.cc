@@ -35,12 +35,26 @@ static data::Value Index_makeTokenValue(const data::Value &args, const ContinueT
 class IndexHandler : public IndexHandlerInterface {
 public:
 	virtual int onRequest() override {
-		auto chans = _component->getChannels().select(_transaction, db::Query().order("subs", db::Ordering::Descending));
+		auto groups = _component->getGroups().select(_transaction, db::Query());
+		for (auto &it : groups.asArray()) {
+			auto chans = _component->getChannels().select(_transaction, db::Query()
+				.select("group", data::Value(it.getInteger("__oid"))).order("subs", db::Ordering::Descending));
+			if (!chans.empty()) {
+				it.setValue(move(chans), "channels");
+			}
+		}
+
+		auto chans = _component->getChannels().select(_transaction, db::Query()
+				.select("group", db::Comparation::IsNull, data::Value(true)).order("subs", db::Ordering::Descending));
 
 		return _request.runPug("templates/index.pug", [&] (pug::Context &exec, const pug::Template &tpl) -> bool {
 			defineTemplateContext(exec);
 
-			exec.set("channels", move(chans));
+			exec.set("groups", move(groups));
+
+			if (!chans.empty()) {
+				exec.set("channels", move(chans));
+			}
 			return true;
 		});
 	}
@@ -61,6 +75,79 @@ public:
 			return true;
 		});
 	}
+};
+
+class GroupHandler : public IndexHandlerInterface {
+public:
+	virtual int onRequest() override {
+		auto id = _params.getInteger("id");
+
+		_group = _component->getGroups().get(_transaction, id);
+		if (!_group) {
+			return HTTP_NOT_FOUND;
+		}
+
+		Map<int64_t, String> channels;
+		if (auto c = _component->getGroups().getProperty(_transaction, _group, "channels")) {
+			for (auto &it : c.asArray()) {
+				channels.emplace(it.getInteger("__oid"), it.getString("title"));
+			}
+			if (!c.empty()) {
+				_group.setValue(move(c), "channels");
+			}
+		}
+
+		auto token = _queryFields.isString("c") ? ContinueToken(_queryFields.getString("c")) : ContinueToken("publised", 100, true);
+
+		db::Query q;
+		q.select("group", data::Value(id)).order("published", db::Ordering::Descending);
+
+		if (auto v = token.performOrdered(_component->getVideos(), _transaction, q)) {
+			for (auto &it : v.asArray()) {
+				auto cIt = channels.find(it.getInteger("channel"));
+				if (cIt != channels.end()) {
+					it.setString(cIt->second, "channel");
+				}
+			}
+			if (!v.empty()) {
+				_group.setValue(move(v), "videos");
+			}
+		}
+
+		data::Value freeChannels;
+		auto c = _component->getChannels().select(_transaction, db::Query().select("group", db::Comparation::IsNull, data::Value(true)).include("title"));
+		for (auto &it : c.asArray()) {
+			freeChannels.addValue(data::Value({
+				pair("__oid", it.getValue("__oid")),
+				pair("title", it.getValue("title")),
+			}));
+		}
+
+		return _request.runPug("templates/group.pug", [&] (pug::Context &exec, const pug::Template &tpl) -> bool {
+			defineTemplateContext(exec);
+
+			exec.set("group", data::Value(_group));
+			exec.set("cursor", Index_makeTokenValue(_queryFields, token));
+
+			if (!freeChannels.empty()) {
+				exec.set("freeChannels", move(freeChannels));
+			}
+
+			return true;
+		});
+	}
+
+	virtual data::Value getBreadcrumbs() const override {
+		auto b = IndexHandlerInterface::getBreadcrumbs();
+		b.addValue(data::Value({
+			pair("title", data::Value(_group.getString("title"))),
+			pair("link", data::Value(toString("/groups/", _group.getInteger("__oid")))),
+		}));
+		return b;
+	}
+
+protected:
+	data::Value _group;
 };
 
 class SectionHandler : public IndexHandlerInterface {

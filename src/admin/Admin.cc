@@ -110,6 +110,15 @@ public:
 		}));
 
 		addHandler("UpdateStats", Request::Method::Get, "/updateStats", SA_HANDLER(AdminUpdateStatsHandler));
+
+		addHandler("SetGroup", Request::Method::Post, "/setGroup", SA_HANDLER(AdminSetGroupHandler))
+				.addQueryFields(mem::Vector<db::Field>({
+			db::Field::Text("target", db::Transform::Url, db::MaxLength(1_KiB))
+		}))
+				.addInputFields(mem::Vector<db::Field>({
+			db::Field::Integer("group", db::Flags::Required),
+			db::Field::Integer("channel", db::Flags::Required)
+		}));
 	}
 };
 

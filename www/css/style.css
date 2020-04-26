@@ -204,3 +204,25 @@ p.license {
 p.license:hover {
 	color: #333;
 }
+
+div.videos {
+	display:flex;
+	flex-wrap: wrap;
+	align-content: start;
+	justify-content: flex-start;
+}
+div.video {
+	flex: 1 320px;
+	padding: 4px 0px;
+}
+div.video > p {
+	padding: 0px;
+	margin: 0px auto;
+	max-width: 98%;
+}
+div.video > p.img {
+	text-align: center;
+}
+div.video > p.img > img {
+	width: 100%;
+}

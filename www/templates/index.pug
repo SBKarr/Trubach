@@ -1,6 +1,30 @@
 
 include templates/include/nav.pug
 
+mixin channels(channels)
+	table.channels
+		tr
+			th №
+			th ID
+			th YouTube
+			th Название
+			th Подписчики
+			th Просмотры
+			th Видео
+		each c, i in channels
+			tr
+				td= i + 1
+				td
+					span.id= "#" + c.__oid
+				td
+					a.object(href="https://www.youtube.com/channel/"+c.id)= c.id
+				td
+					a.object(href="/channels/"+c.__oid)
+						span.title= c.title
+				td= c.subs
+				td= c.nviews
+				td= c.nvideos
+
 doctype html
 html
 	head
@@ -11,48 +35,39 @@ html
 		.main
 			+breadcrumbs
 			h1 Разделы
-			each s in sections
+			each g in groups
 				.objects
-					p.object
-						a.object(href="/sections/"+s.__oid)
-							span.id= "#" + s.__oid
+					h2.object
+						a.object(href="/groups/"+g.__oid)
+							span.id= "#" + g.__oid
 							|
 							|
-							span.title= s.title
+							span.title= g.title
 							|
 							|
-							span.name= "(" + s.name + ")"
-			h1 Каналы
-			.objects
-				table.channels
-					tr
-						th №
-						th ID
-						th YouTube
-						th Название
-						th Подписчики
-						th Просмотры
-						th Видео
-					each c, i in channels
-						tr
-							td= i + 1
-							td
-								span.id= "#" + c.__oid
-							td
-								a.object(href="https://www.youtube.com/channel/"+c.id)= c.id
-							td
-								a.object(href="/channels/"+c.__oid)
-									span.title= c.title
-							td= c.subs
-							td= c.nviews
-							td= c.nvideos
+							span.name= "(" + g.name + ")"
+					if g.channels
+						+channels(g.channels)
 			if admin
 				.create
 					h2 Добавить раздел
 					form.create(
 						method="POST",
-						action="/api/v1/sections?target=" + encodeURIComponent(window.location.href)
+						action="/api/v1/groups?target=" + encodeURIComponent(window.location.href)
 					)
 						+input("name","Name")
 						+input("title","Title")
+						input(type="submit",value="Create")
+			if channels		
+				h1 Каналы
+				.objects
+					+channels(channels)
+			if admin
+				.create
+					h2 Добавить канал
+					form.create(
+						method="POST",
+						action="/admin/addChannel?target=" + encodeURIComponent(window.location.href)
+					)
+						+input("url","URL")
 						input(type="submit",value="Create")

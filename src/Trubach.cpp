@@ -82,7 +82,7 @@ TrubachComponent::TrubachComponent(Server &serv, const String &name, const data:
 			Field::Text("standard", MaxLength(1_KiB)),
 		})),
 
-		Field::Object("channel", _channels),
+		Field::Object("channel", _channels, RemovePolicy::Null),
 		Field::Object("group", _groups, RemovePolicy::Null, DefaultFn([this] (const data::Value &val) -> data::Value {
 			if (auto c = _channels.get(Transaction::acquireIfExists(), val.getInteger("channel"), "group")) {
 				if (auto g = c.getInteger("group")) {
@@ -209,6 +209,7 @@ void TrubachComponent::onChildInit(Server &serv) {
 	serv.addHandler(toString("/hub/", HUB_SECRET), SA_HANDLER(HubHandler));
 
 	serv.addResourceHandler("/api/v1/sections/", _sections);
+	serv.addResourceHandler("/api/v1/groups/", _groups);
 
 	Task::perform(_server, [&] (Task &task) {
 		task.addExecuteFn([this] (const Task &task) -> bool {

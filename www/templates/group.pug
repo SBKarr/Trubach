@@ -1,0 +1,63 @@
+//-
+	Required:
+		group
+
+include templates/include/nav.pug
+
+mixin channels(channels)
+	table.channels
+		tr
+			th №
+			th ID
+			th YouTube
+			th Название
+			th Подписчики
+			th Просмотры
+			th Видео
+		each c, i in channels
+			tr
+				td= i + 1
+				td
+					span.id= "#" + c.__oid
+				td
+					a.object(href="https://www.youtube.com/channel/"+c.id)= c.id
+				td
+					a.object(href="/channels/"+c.__oid)
+						span.title= c.title
+				td= c.subs
+				td= c.nviews
+				td= c.nvideos
+
+doctype html
+html
+	head
+		title= "Trubach: " + group.title
+		+style
+	body
+		+nav
+		.main
+			+breadcrumbs
+			h1= group.title
+			if group.channels
+				+channels(group.channels)
+
+			if admin
+				form.update(method="POST",action="/admin/setGroup?target=" + encodeURIComponent(window.location.href))
+					p
+						select(name="channel")
+							each c in freeChannels
+								option(value=c.__oid)= c.title
+						input(name="group",type="hidden",value=group.__oid)
+						input(type="submit",value="Add")
+
+			if group.videos
+				+cursor
+				.videos
+					each v in group.videos
+						.video
+							p.channel= v.channel
+							p.img: img(src=v.thumbs.medium)
+							p.link
+								a.video(href="https://www.youtube.com/watch?v="+v.id)
+									span.title= v.title
+				+cursor

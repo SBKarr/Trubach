@@ -265,7 +265,30 @@ public:
 			pair("date", data::Value(Time::now().toMicros())),
 			pair("OK", data::Value(true))
 		}));
-		return HTTP_OK;
+		return DONE;
+	}
+};
+
+class AdminSetGroupHandler : public AdminHandlerInterface {
+public:
+	virtual int onRequest() override {
+		UrlView v(_queryFields.getString("target"));
+
+		if (auto c = _component->getChannels().get(_transaction, _inputFields.getInteger("channel"))) {
+			if (auto g = _component->getGroups().get(_transaction, _inputFields.getInteger("group"))) {
+				_component->getChannels().update(_transaction, c, data::Value({
+					pair("group", data::Value(g.getInteger("__oid")))
+				}));
+				auto v = _component->getChannels().getProperty(_transaction, c, "videos");
+				for (auto &it : v.asArray()) {
+					_component->getVideos().update(_transaction, it, data::Value({
+						pair("group", data::Value(g.getInteger("__oid")))
+					}));
+				}
+			}
+		}
+
+		return _request.redirectTo(v.get());
 	}
 };
 

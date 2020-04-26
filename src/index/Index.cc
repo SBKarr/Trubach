@@ -24,6 +24,7 @@ class IndexHandlerMap : public HandlerMap {
 public:
 	IndexHandlerMap() {
 		addHandler("Index", Request::Method::Get, "/", SA_HANDLER(IndexHandler));
+		addHandler("Group", Request::Method::Get, "/groups/:id", SA_HANDLER(GroupHandler));
 		addHandler("Section", Request::Method::Get, "/sections/:id", SA_HANDLER(SectionHandler));
 		addHandler("Channel", Request::Method::Get, "/channels/:id", SA_HANDLER(ChannelHandler));
 		addHandler("Tools", Request::Method::Get, "/tools", SA_HANDLER(IndexToolsHandler));
