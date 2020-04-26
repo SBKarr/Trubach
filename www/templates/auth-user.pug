@@ -1,0 +1,30 @@
+//-
+	Required:
+		longSessionUserId
+		sessionUuid
+		sessionUserId
+		user
+
+doctype html
+html
+	head
+		title User Auth Test Page
+	body
+		h1 User test handler
+		.links
+			p: a(target="_blank", href="/auth/external/login?provider=google") Sign In with Google
+			p: a(target="_blank", href="/auth/external/login?provider=vk") Sign In with Vk
+			p: a(target="_blank", href="/auth/external/login?provider=facebook") Sign In with Facebook
+			p: a(target="_blank", href="/auth/external/try") Try sign in
+			p: a(href="/auth/external/cancel?target="+encodeURIComponent(window.location.href)) Cancel auth
+			p: a(href="/auth/external/exit?target="+encodeURIComponent(window.location.href)) Exit auth (store long token)
+		p Long session: #{longSessionUserId}
+		p Session: #{sessionUuid} #{sessionUserId} 
+
+		p= serenity.prettify(user)
+		if user
+			p
+				img(src=user.picture, alt="User image")
+				pre: code= serenity.prettify(user)
+		else
+			p Not logged in

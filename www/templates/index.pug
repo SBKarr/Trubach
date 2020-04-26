@@ -1,0 +1,58 @@
+
+include templates/include/nav.pug
+
+doctype html
+html
+	head
+		title Trubach
+		+style
+	body
+		+nav
+		.main
+			+breadcrumbs
+			h1 Разделы
+			each s in sections
+				.objects
+					p.object
+						a.object(href="/sections/"+s.__oid)
+							span.id= "#" + s.__oid
+							|
+							|
+							span.title= s.title
+							|
+							|
+							span.name= "(" + s.name + ")"
+			h1 Каналы
+			.objects
+				table.channels
+					tr
+						th №
+						th ID
+						th YouTube
+						th Название
+						th Подписчики
+						th Просмотры
+						th Видео
+					each c, i in channels
+						tr
+							td= i + 1
+							td
+								span.id= "#" + c.__oid
+							td
+								a.object(href="https://www.youtube.com/channel/"+c.id)= c.id
+							td
+								a.object(href="/channels/"+c.__oid)
+									span.title= c.title
+							td= c.subs
+							td= c.nviews
+							td= c.nvideos
+			if admin
+				.create
+					h2 Добавить раздел
+					form.create(
+						method="POST",
+						action="/api/v1/sections?target=" + encodeURIComponent(window.location.href)
+					)
+						+input("name","Name")
+						+input("title","Title")
+						input(type="submit",value="Create")

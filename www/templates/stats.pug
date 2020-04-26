@@ -1,0 +1,44 @@
+
+include templates/include/nav.pug
+
+doctype html
+html
+	head
+		title Trubach: Статистика
+		+style
+	body
+		+nav
+		.main
+			+breadcrumbs
+			if stats
+				h1 Снапшоты
+				each s in stats
+					p.links
+						a(href="/stats/"+s.__oid)= serenity.timeToHttp(s.date)
+			if stat
+				h1 Статистика по каналам от #{serenity.timeToHttp(stat.date)}
+				table.channels
+					tr
+						th №
+						th ID
+						th YouTube
+						th Название
+						th
+							a.sort(href=window.location.pathname+"?ord=subs&sort=" + ((ord=="subs"&&sort=="desc")?"asc":"desc")) Подписчики
+						th
+							a.sort(href=window.location.pathname+"?ord=nviews&sort=" + ((ord=="nviews"&&sort=="desc")?"asc":"desc")) Просмотры
+						th
+							a.sort(href=window.location.pathname+"?ord=nvideos&sort=" + ((ord=="nvideos"&&sort=="desc")?"asc":"desc")) Видео
+					each c, i in channels
+						tr
+							td= i + 1
+							td
+								span.id= "#" + c.chan.__oid
+							td
+								a.object(href="https://www.youtube.com/channel/"+c.chan.id)= c.chan.id
+							td
+								a.object(href="/channels/"+c.chan.__oid)
+									span.title= c.chan.title
+							td= c.subs
+							td= c.nviews
+							td= c.nvideos

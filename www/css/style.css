@@ -1,0 +1,206 @@
+html {
+	font-size: 16px;
+}
+
+h1, h2, p, li, a, span, figcaption, th, td {
+	font-family: "Roboto";
+}
+
+
+
+form {
+	background-color: #e0f2f1;
+	padding: 4px;
+}
+
+form p {
+	margin: 0;
+}
+
+form.inline {
+	display: inline-block;
+}
+
+form input {
+	background-color: #e0f2f1;
+}
+form input[type=submit] {
+	outline:none;
+	border:none;
+	text-transform: uppercase;
+	background-color: #607d8b;
+	padding: 6px 12px;
+	color: white;
+}
+
+div.nav {
+	height: 100%;
+	width: 320px;
+	position: fixed;
+	z-index: 1;
+	top: 0;
+	left: 0;
+	background-color: #eee;
+	overflow-x: hidden;
+}
+
+div.nav-content {
+	margin-top: 10px;
+	margin-bottom: 20px;
+}
+
+.nav-content > h1 {
+	font-size: 1.2rem;
+	margin: 0;
+	padding: 0;
+	font-weight: 300;
+	text-align: center;
+}
+
+.nav-content > p.nav {
+	font-size: 1.2rem;
+	margin: 0.3rem;
+	padding: 0;
+}
+
+.nav-content > p.user {
+	text-align: right;
+}
+
+.nav-content > p.l1 {
+	margin-left: 12px;
+	font-size: 1.1rem !important;
+}
+
+.nav-content > p.l2 {
+	margin-left: 24px;
+	font-size: 1.05rem !important;
+}
+
+.nav-content > p.l3 {
+	margin-left: 36px;
+	font-size: 1.0rem !important;
+}
+
+.nav-content a {
+	margin: 6px;
+	color: #00bfa5;
+	font-weight: 500;
+}
+
+.nav-content a:hover {
+	color: #1de9b6;
+}
+
+p.breadcrumbs {
+	font-size: 1.1rem;
+	font-weight: 500;
+}
+
+a.breadcrumbs {
+	margin: 6px;
+	color: #00bfa5;
+}
+
+a.breadcrumbs:hover {
+	color: #1de9b6;
+}
+
+.main {
+	margin-left: 320px;
+	padding: 0px 10px;
+}
+
+.main h1 {
+	font-size: 1.3rem;
+	margin: 0.2rem;
+	padding: 0;
+	font-weight: 400;
+}
+
+.main h2 {
+	font-size: 1.2rem;
+	margin: 0.2rem;
+	margin-top: 1rem;
+	padding: 0;
+	font-weight: 300;
+}
+
+span.input {
+	display: inline-block;
+	vertical-align: middle;
+}
+
+form.large span.input {
+	display: block;
+}
+
+span.input > span.placeholder {
+	display: block;
+	padding: 0;
+	margin: 0 0 -4px 8px;
+	font-size: 0.9rem;
+	color: #666;
+	font-weight: 900;
+}
+
+span.input > input {
+	display: block;
+	padding: 2px 0;
+	margin: 8px;
+	border: none;
+	border-bottom: 2px solid #bbb;
+}
+
+span.input > input:focus {
+	border-bottom: 2px solid #6200ea;
+}
+
+span.input > input[type=text] {
+	width: 260px;
+}
+
+form.large span.input > input[type=text] {
+	width: 95%;
+}
+
+span.input > input[type=number] {
+	width: 80px;
+}
+
+a.action {
+	font-weight: 500;
+	margin: 6px;
+}
+
+a.action.update { color: #6200ea; }
+a.action.update:hover { color: #7c4dff; }
+
+a.action.remove { color: #c51162; }
+a.action.remove:hover { color: #ff4081; }
+
+table.channels {
+	margin: 1%;
+	width: 98%;
+}
+table.channels th {
+	padding: 6px 2px;
+	background-color: #ddd;
+}
+table.channels td {
+	text-align: center;
+	vertical-align: middle;
+}
+table.channels tr:nth-child(odd) { background: #ddd }
+table.channels tr:nth-child(even) { background: #eee }
+table.channels tr:hover { background: #fff }
+
+p.license {
+	text-align: center;
+	margin: 10px 6px;
+	color: #999;
+	font-size: 0.9rem;
+}
+p.license:hover {
+	color: #333;
+}
