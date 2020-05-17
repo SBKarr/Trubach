@@ -36,7 +36,7 @@ enum class NotificationFormat {
 	Html,
 };
 
-void sendTgMessage(const data::Value &note, const StringView &data, NotificationFormat fmt);
+void sendTgMessage(const data::Value &note, const StringView &data, NotificationFormat fmt, const data::Value &extra = data::Value());
 void updateTgIntegration();
 
 class TrubachComponent : public ServerComponent {

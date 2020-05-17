@@ -81,7 +81,7 @@ static data::Value HubHandler_readEntry(StringView r) {
 
 static data::Value HubHandler_updateVideo(StringView id, int64_t channel = 0) {
 	auto apiUrl = toString("https://www.googleapis.com/youtube/v3/videos?key=", YOUTUBE_API_KEY,
-			"&id=", id, "&part=snippet");
+			"&id=", id, "&part=snippet%2CcontentDetails");
 
 	network::Handle h(NetworkHandle::Method::Get, apiUrl);
 
@@ -89,6 +89,7 @@ static data::Value HubHandler_updateVideo(StringView id, int64_t channel = 0) {
 		for (auto &item : val.getArray("items")) {
 			auto &snippet = item.getValue("snippet");
 			auto &thumbs = snippet.getValue("thumbnails");
+			auto &details = item.getValue("contentDetails");
 
 			data::Value ret({
 				pair("id", data::Value(item.getString("id"))),
@@ -102,6 +103,7 @@ static data::Value HubHandler_updateVideo(StringView id, int64_t channel = 0) {
 					pair("medium", data::Value(thumbs.getValue("medium").getString("url"))),
 					pair("standard", data::Value(thumbs.getValue("standard").getString("url"))),
 				})),
+				pair("duration", details.getValue("duration"))
 			});
 
 			if (channel) {
@@ -206,6 +208,9 @@ void HubHandler::onFilterComplete(InputFilter *f) {
 			body << "Новое видео на канале \"" << d.getString("channel") << "\": <a href=\""
 					<< d.getString("link") << "\">" << d.getString("title") << "</a>";
 
+			if (d.hasValue("duration")) {
+				body << " [" << d.getString("duration") << "]";
+			}
 			auto notes = _component->getNotifiers().select(_transaction, db::Query());
 			for (auto &it : notes.asArray()) {
 				sendTgMessage(it, body.weak(), NotificationFormat::Html);
@@ -269,11 +274,17 @@ data::Value HubHandler::pushData(const data::Value &d) const {
 		if (auto c = _component->getChannels().select(_transaction, db::Query().select("id", data::Value(chanId))).getValue(0)) {
 			auto patch = HubHandler_updateVideo(vidId, c.getInteger("__oid"));
 			_component->getVideos().create(_transaction, patch);
-			return data::Value({
+			auto ret = data::Value({
 				pair("link", data::Value(d.getString("link"))),
 				pair("title", data::Value(d.getString("title"))),
 				pair("channel", data::Value(c.getString("title"))),
 			});
+
+			if (patch.hasValue("duration")) {
+				ret.setValue(patch.getValue("duration"), "duration");
+			}
+
+			return ret;
 		}
 	}
 	return data::Value();

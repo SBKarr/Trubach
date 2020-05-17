@@ -31,11 +31,13 @@ public:
 	virtual bool processDataHandler(Request &req, mem::Value &result, mem::Value &input);
 
 protected:
+	void makeDigest(int64_t chatId, StringView) const;
+
 	db::Transaction _transaction = nullptr;
 	TrubachComponent *_component = nullptr;
 };
 
-void sendTgMessage(const data::Value &note, const StringView &data, NotificationFormat fmt) {
+void sendTgMessage(const data::Value &note, const StringView &data, NotificationFormat fmt, const data::Value &extra) {
 	data::Value patch;
 	if (note.isInteger()) {
 		patch = data::Value({
@@ -53,6 +55,12 @@ void sendTgMessage(const data::Value &note, const StringView &data, Notification
 				pair("chat_id", data::Value(note.getString("channel"))),
 				pair("text", data::Value(data))
 			});
+		}
+	}
+
+	if (extra) {
+		for (auto &it : extra.asDict()) {
+			patch.setValue(move(it.second), it.first);
 		}
 	}
 
@@ -156,10 +164,103 @@ bool TgBotHandler::processDataHandler(Request &req, mem::Value &result, mem::Val
 				body << "Вы не подписаны на уведомления";
 			}
 			sendTgMessage(data::Value(chatId), body.weak(), NotificationFormat::Plain);
+		} else if (text.starts_with("digest ")) {
+			makeDigest(chatId, text.sub("digest "_len));
 		}
 		return true;
 	});
 	return true;
+}
+
+void TgBotHandler::makeDigest(int64_t chatId, StringView tag) const {
+	Vector<data::Value *> smallChans;
+	Vector<data::Value *> largeChans;
+
+	Map<int64_t, data::Value> groups;
+	Map<int64_t, data::Value> chans;
+	tag.split<StringView::CharGroup<CharGroupId::WhiteSpace>>([&] (StringView w) {
+		if (auto g = _component->getGroups().select(_transaction, db::Query().select("name", data::Value(w))).getValue(0)) {
+			if (auto channels = _component->getChannels().select(_transaction, db::Query().select("group", data::Value(g.getInteger("__oid"))))) {
+				for (auto &it : channels.asArray()) {
+					auto v = _component->getVideos().select(_transaction, db::Query().select("channel", data::Value(it.getInteger("__oid")))
+							.select("ctime", db::Comparation::GreatherThen, data::Value((Time::now() - TimeInterval::seconds(60 * 60 * 24)).toMicros())));
+					if (v.size() > 0) {
+						it.setValue(move(v), "videos");
+						auto iit = chans.emplace(it.getInteger("__oid"), move(it)).first;
+						if (auto v = iit->second.getInteger("subs")) {
+							if (v < 10000) {
+								smallChans.emplace_back(&iit->second);
+							} else {
+								largeChans.emplace_back(&iit->second);
+							}
+						}
+					}
+				}
+			}
+			groups.emplace(g.getInteger("__oid"), move(g));
+		}
+	});
+
+	StringStream str;
+	if (groups.size() == 1) {
+		str << "<b>Новые видео на каналах группы «" << groups.begin()->second.getString("title") << "»</b>\n\n";
+	} else if (!groups.empty()) {
+		str << "<b>Новые видео на каналах групп ";
+		auto it = groups.begin();
+		str << "«" << it->second.getString("title") << "»";
+		++ it;
+		while (it != groups.end()) {
+			auto next = it;
+			++ next;
+
+			if (next == groups.end()) {
+				str << " и «" << it->second.getString("title") << "»";
+			} else {
+				str << ", «" << it->second.getString("title") << "»";
+			}
+
+			it = next;
+		}
+		str << "</b>\n\n";
+	}
+
+	if (!smallChans.empty()) {
+		str << "\n<b>Развивающиеся каналы</b>:\n";
+		for (auto &it : smallChans) {
+			str << "\n• <u>" << it->getString("title") << "</u> <a href=\"https://www.youtube.com/channel/"
+					<< it->getString("id") << "\">[ссылка]</a>\n";
+			for (auto &vIt : it->getArray("videos")) {
+				str << "  — <a href=\"https://www.youtube.com/watch?v="
+						<< vIt.getString("id") << "\">" << vIt.getString("title") << "</a>";
+				if (vIt.hasValue("duration")) {
+					str << " [" << vIt.getString("duration") << "]";
+				}
+				str << "\n";
+			}
+		}
+	}
+
+	if (!largeChans.empty()) {
+		if (!smallChans.empty()) {
+			str << "\n\n<b>Крупные каналы</b>:\n";
+		}
+		for (auto &it : largeChans) {
+			str << "\n• <u>" << it->getString("title") << "</u> <a href=\"https://www.youtube.com/channel/"
+					<< it->getString("id") << "\">[ссылка]</a>\n";
+			for (auto &vIt : it->getArray("videos")) {
+				str << "  — <a href=\"https://www.youtube.com/watch?v="
+						<< vIt.getString("id") << "\">" << vIt.getString("title") << "</a>";
+				if (vIt.hasValue("duration")) {
+					str << " [" << vIt.getString("duration") << "]";
+				}
+				str << "\n";
+			}
+		}
+	}
+
+	sendTgMessage(data::Value(chatId), str.weak(), NotificationFormat::Html, data::Value({
+		pair("disable_web_page_preview", data::Value(true))
+	}));
 }
 
 NS_SA_EXT_END(trubach)

@@ -65,7 +65,7 @@ TrubachComponent::TrubachComponent(Server &serv, const String &name, const data:
 	}));
 
 	_videos.define(Vector<Field>({
-		Field::Integer("ctime", Flags::AutoCTime),
+		Field::Integer("ctime", Flags::AutoCTime, Flags::Indexed),
 		Field::Integer("mtime", Flags::AutoMTime),
 
 		Field::Text("id", Flags::Indexed, Flags::Unique),
@@ -76,6 +76,7 @@ TrubachComponent::TrubachComponent(Server &serv, const String &name, const data:
 		Field::Text("title"),
 		Field::Text("desc"),
 		Field::Data("data", Flags::ForceExclude),
+		Field::Text("duration", MinLength(1)),
 
 		Field::Extra("thumbs", Vector<Field>({
 			Field::Text("default", MaxLength(1_KiB)),
@@ -363,7 +364,7 @@ void TrubachComponent::updateTimers(const db::Transaction &t) const {
 	_timers.create(t, data::Value({
 		pair("tag", data::Value("subscriptions")),
 		pair("interval", data::Value(TimeInterval::seconds(60 * 10)))
-	}), db::Conflict::DoNothing);
+	}), db::Conflict("tag", db::Query::Select(), db::Conflict::DoNothing));
 }
 
 SP_EXTERN_C ServerComponent * CreateHandler(Server &serv, const String &name, const data::Value &dict) {
