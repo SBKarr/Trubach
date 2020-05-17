@@ -46,6 +46,7 @@ public:
 
 	virtual void onChildInit(Server &) override;
 	virtual void onStorageTransaction(db::Transaction &t) override;
+	virtual void onHeartbeat(Server &) override;
 
 	UsersComponent *getUsers() const;
 
@@ -57,10 +58,20 @@ public:
 	const Scheme &getChanstat() const;
 	const Scheme &getChansnap() const;
 	const Scheme &getNotifiers() const;
+	const Scheme &getMessages() const;
 
 protected:
+	void onTagUpdate(db::Transaction &, StringView) const;
+
+	data::Value subscribeAll(const db::Transaction &) const;
+	data::Value unsubscribeAll(const db::Transaction &) const;
+
 	bool subscribeChannel(const data::Value &) const;
 	bool unsubscribeChannel(const data::Value &) const;
+
+	void updateTimers(const db::Transaction &) const;
+
+	Time _lastUpdate = Time::now();
 
 	Scheme _channels = Scheme("channels");
 	Scheme _videos = Scheme("videos");
@@ -71,6 +82,8 @@ protected:
 	Scheme _chansnap = Scheme("chansnap", Scheme::Detouched);
 
 	Scheme _notifiers = Scheme("notifiers");
+	Scheme _timers = Scheme("timers");
+	Scheme _messages = Scheme("messages");
 
 	UsersComponent *_users = nullptr;
 };

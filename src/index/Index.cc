@@ -17,6 +17,7 @@ as the name is changed.
 #include "Index.h"
 
 #include "IndexChannels.cc"
+#include "IndexStat.cc"
 
 NS_SA_EXT_BEGIN(trubach)
 

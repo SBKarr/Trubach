@@ -23,6 +23,8 @@ as the name is changed.
 #include "TGBot.cc"
 #include "Hub.cc"
 
+#include "STPqHandle.h"
+
 NS_SA_EXT_BEGIN(trubach)
 
 TrubachComponent::TrubachComponent(Server &serv, const String &name, const data::Value &dict)
@@ -33,7 +35,7 @@ TrubachComponent::TrubachComponent(Server &serv, const String &name, const data:
 
 	_users = users;
 
-	exportValues(_channels, _videos, _groups, _sections, _chanstat, _chansnap, _notifiers);
+	exportValues(_channels, _videos, _groups, _sections, _chanstat, _chansnap, _notifiers, _timers, _messages);
 
 	_channels.define(Vector<Field>({
 		Field::Integer("ctime", Flags::AutoCTime),
@@ -97,6 +99,7 @@ TrubachComponent::TrubachComponent(Server &serv, const String &name, const data:
 		Field::Text("name", Transform::Alias),
 		Field::Text("title", MaxLength(1_KiB)),
 		Field::Set("channels", _channels),
+		Field::Set("videos", _videos),
 	}));
 
 	_sections.define(Vector<Field>({
@@ -127,6 +130,21 @@ TrubachComponent::TrubachComponent(Server &serv, const String &name, const data:
 		Field::Text("username", MinLength(1)),
 	}));
 
+	_timers.define(Vector<Field>({
+		Field::Integer("date", Flags::Indexed, DefaultFn([&] (const data::Value &) -> data::Value {
+			return data::Value(Time::now().toMicros());
+		})),
+		Field::Integer("interval", Flags::Indexed, data::Value(0)),
+		Field::Text("tag", MinLength(1), Flags::Indexed | Flags::Unique),
+	}));
+
+	_messages.define(Vector<Field>({
+		Field::Text("tag", MinLength(1)),
+		Field::Text("type", MinLength(1)),
+		Field::Text("text", MinLength(1)),
+		Field::Integer("object"),
+	}));
+
 	_users->init(this);
 }
 
@@ -152,52 +170,14 @@ void TrubachComponent::onChildInit(Server &serv) {
 
 	addCommand("subscribe-all", [this] (const StringView &str) -> data::Value {
 		if (auto t = db::Transaction::acquire()) {
-			data::Value success;
-			data::Value errors;
-			auto c = _channels.select(t, db::Query());
-			for (auto &it : c.asArray()) {
-				if (!subscribeChannel(it)) {
-					errors.addValue(data::Value({
-						pair("__oid", it.getValue("__oid")),
-						pair("title", it.getValue("title"))
-					}));
-				} else {
-					success.addValue(data::Value({
-						pair("__oid", it.getValue("__oid")),
-						pair("title", it.getValue("title"))
-					}));
-				}
-			}
-			return data::Value({
-				pair("errors", move(errors)),
-				pair("success", move(success))
-			});
+			return subscribeAll(t);
 		}
 		return data::Value("Fail to perform command");
 	});
 
 	addCommand("unsubscribe-all", [this] (const StringView &str) -> data::Value {
 		if (auto t = db::Transaction::acquire()) {
-			data::Value success;
-			data::Value errors;
-			auto c = _channels.select(t, db::Query());
-			for (auto &it : c.asArray()) {
-				if (!unsubscribeChannel(it)) {
-					errors.addValue(data::Value({
-						pair("__oid", it.getValue("__oid")),
-						pair("title", it.getValue("title"))
-					}));
-				} else {
-					success.addValue(data::Value({
-						pair("__oid", it.getValue("__oid")),
-						pair("title", it.getValue("title"))
-					}));
-				}
-			}
-			return data::Value({
-				pair("errors", move(errors)),
-				pair("success", move(success))
-			});
+			return unsubscribeAll(t);
 		}
 		return data::Value("Fail to perform command");
 	});
@@ -214,6 +194,9 @@ void TrubachComponent::onChildInit(Server &serv) {
 	Task::perform(_server, [&] (Task &task) {
 		task.addExecuteFn([this] (const Task &task) -> bool {
 			updateTgIntegration();
+			task.performWithStorage([&] (const db::Transaction &t) {
+				updateTimers(t);
+			});
 			return true;
 		});
 	});
@@ -229,40 +212,115 @@ void TrubachComponent::onStorageTransaction(db::Transaction &t) {
 	}
 }
 
+void TrubachComponent::onHeartbeat(Server &serv) {
+	Time now = Time::now();
+
+	auto diff = now - _lastUpdate;
+	if (diff > TimeInterval::seconds(5)) {
+		serv.performWithStorage([&] (db::Transaction &t) {
+			t.setRole(db::AccessRoleId::System);
+
+			StringStream stream;
+			stream << "UPDATE timers SET date=" << now.toMicros() << " WHERE date+interval < " << now.toMicros()
+					<< " RETURNING __oid, date, tag, interval;";
+
+			Vector<StringView> toUpdate;
+			if (auto h = dynamic_cast<db::pq::Handle *>(t.getAdapter().interface())) {
+				h->performSimpleSelect(stream.weak(), [&] (db::sql::Result &res) {
+					if (res.nrows() > 0) {
+						for (auto it : res) {
+							toUpdate.emplace_back(it.toString(2).pdup());
+						}
+					}
+				});
+			}
+
+			for (auto &it : toUpdate) {
+				onTagUpdate(t, it);
+			}
+		});
+		_lastUpdate = now;
+	}
+}
+
 UsersComponent *TrubachComponent::getUsers() const {
 	return _users;
 }
 
-const db::Scheme &TrubachComponent::getChannels() const {
-	return _channels;
+const db::Scheme &TrubachComponent::getChannels() const { return _channels; }
+const db::Scheme &TrubachComponent::getVideos() const { return _videos; }
+const db::Scheme &TrubachComponent::getGroups() const { return _groups; }
+const db::Scheme &TrubachComponent::getSections() const { return _sections; }
+const db::Scheme &TrubachComponent::getChanstat() const { return _chanstat; }
+const db::Scheme &TrubachComponent::getChansnap() const { return _chansnap; }
+const db::Scheme &TrubachComponent::getNotifiers() const { return _notifiers; }
+const db::Scheme &TrubachComponent::getMessages() const { return _messages; }
+
+void TrubachComponent::onTagUpdate(db::Transaction &t, StringView tag) const {
+	if (tag == "subscriptions") {
+#if RELEASE
+		Task::perform(_server, [&] (Task &task) {
+			task.addExecuteFn([this] (const Task &task) -> bool {
+				task.performWithStorage([&] (const db::Transaction &t) {
+					subscribeAll(t);
+				});
+				return true;
+			});
+		});
+#endif
+	} else {
+		std::cout << tag << "\n";
+	}
 }
 
-const db::Scheme &TrubachComponent::getVideos() const {
-	return _videos;
+data::Value TrubachComponent::subscribeAll(const db::Transaction &t) const {
+	data::Value success;
+	data::Value errors;
+	auto c = _channels.select(t, db::Query());
+	for (auto &it : c.asArray()) {
+		if (!subscribeChannel(it)) {
+			errors.addValue(data::Value({
+				pair("__oid", it.getValue("__oid")),
+				pair("title", it.getValue("title"))
+			}));
+		} else {
+			success.addValue(data::Value({
+				pair("__oid", it.getValue("__oid")),
+				pair("title", it.getValue("title"))
+			}));
+		}
+	}
+	return data::Value({
+		pair("errors", move(errors)),
+		pair("success", move(success))
+	});
 }
 
-const db::Scheme &TrubachComponent::getGroups() const {
-	return _groups;
-}
-
-const db::Scheme &TrubachComponent::getSections() const {
-	return _sections;
-}
-
-const db::Scheme &TrubachComponent::getChanstat() const {
-	return _chanstat;
-}
-
-const db::Scheme &TrubachComponent::getChansnap() const {
-	return _chansnap;
-}
-
-const db::Scheme &TrubachComponent::getNotifiers() const {
-	return _notifiers;
+data::Value TrubachComponent::unsubscribeAll(const db::Transaction &t) const {
+	data::Value success;
+	data::Value errors;
+	auto c = _channels.select(t, db::Query());
+	for (auto &it : c.asArray()) {
+		if (!unsubscribeChannel(it)) {
+			errors.addValue(data::Value({
+				pair("__oid", it.getValue("__oid")),
+				pair("title", it.getValue("title"))
+			}));
+		} else {
+			success.addValue(data::Value({
+				pair("__oid", it.getValue("__oid")),
+				pair("title", it.getValue("title"))
+			}));
+		}
+	}
+	return data::Value({
+		pair("errors", move(errors)),
+		pair("success", move(success))
+	});
 }
 
 bool TrubachComponent::subscribeChannel(const data::Value &ch) const {
-	if (ch.getInteger("subscribed") <= int64_t(Time::now().toMicros())) {
+	if (ch.getInteger("subscribed") <= int64_t((Time::now() - TimeInterval::seconds(1200)).toMicros())) {
 		NetworkHandle h;
 		h.init(NetworkHandle::Method::Post, toString("https://pubsubhubbub.appspot.com"));
 
@@ -299,6 +357,13 @@ bool TrubachComponent::unsubscribeChannel(const data::Value &ch) const {
 		return code == 202;
 	}
 	return false;
+}
+
+void TrubachComponent::updateTimers(const db::Transaction &t) const {
+	_timers.create(t, data::Value({
+		pair("tag", data::Value("subscriptions")),
+		pair("interval", data::Value(TimeInterval::seconds(60 * 10)))
+	}), db::Conflict::DoNothing);
 }
 
 SP_EXTERN_C ServerComponent * CreateHandler(Server &serv, const String &name, const data::Value &dict) {

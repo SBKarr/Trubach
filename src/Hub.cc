@@ -226,17 +226,33 @@ bool HubHandler::subscribe(StringView id, int64_t lease) {
 				pair("subscribed", data::Value(leaseTime.toMicros()))
 			}));
 
+			_component->getMessages().create(_transaction, data::Value({
+				pair("tag", data::Value("subsctiption")),
+				pair("type", data::Value("subscribe")),
+				pair("text", data::Value(toString("Subscribed: ", c.getString("title")))),
+				pair("object", data::Value(id))
+			}));
+
 			return true;
 		}
 		return false;
 	});
 }
+
 bool HubHandler::unsubscribe(StringView id) {
 	return _transaction.performAsSystem([&] () -> bool {
 		if (auto c = _component->getChannels().select(_transaction, db::Query().select("id", data::Value(id))).getValue(0)) {
 			_component->getChannels().update(_transaction, c, data::Value({
 				pair("subscribed", data::Value(0))
 			}));
+
+			_component->getMessages().create(_transaction, data::Value({
+				pair("tag", data::Value("subsctiption")),
+				pair("type", data::Value("unsubscribe")),
+				pair("text", data::Value(toString("Unsubscribed: ", c.getString("title")))),
+				pair("object", data::Value(id))
+			}));
+
 			return true;
 		}
 		return false;
