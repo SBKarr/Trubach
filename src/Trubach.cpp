@@ -218,7 +218,7 @@ void TrubachComponent::onHeartbeat(Server &serv) {
 
 	auto diff = now - _lastUpdate;
 	if (diff > TimeInterval::seconds(5)) {
-		serv.performWithStorage([&] (db::Transaction &t) {
+		serv.performWithStorage([&] (const db::Transaction &t) {
 			t.setRole(db::AccessRoleId::System);
 
 			StringStream stream;
@@ -257,7 +257,7 @@ const db::Scheme &TrubachComponent::getChansnap() const { return _chansnap; }
 const db::Scheme &TrubachComponent::getNotifiers() const { return _notifiers; }
 const db::Scheme &TrubachComponent::getMessages() const { return _messages; }
 
-void TrubachComponent::onTagUpdate(db::Transaction &t, StringView tag) const {
+void TrubachComponent::onTagUpdate(const db::Transaction &t, StringView tag) const {
 	if (tag == "subscriptions") {
 #if RELEASE
 		Task::perform(_server, [&] (Task &task) {

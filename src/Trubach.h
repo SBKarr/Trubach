@@ -61,7 +61,7 @@ public:
 	const Scheme &getMessages() const;
 
 protected:
-	void onTagUpdate(db::Transaction &, StringView) const;
+	void onTagUpdate(const db::Transaction &, StringView) const;
 
 	data::Value subscribeAll(const db::Transaction &) const;
 	data::Value unsubscribeAll(const db::Transaction &) const;
