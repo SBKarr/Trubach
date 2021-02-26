@@ -263,4 +263,33 @@ void TgBotHandler::makeDigest(int64_t chatId, StringView tag) const {
 	}));
 }
 
+class TgAuthHandler : public RequestHandler {
+public:
+	virtual bool isRequestPermitted(Request &) override;
+	virtual int onTranslateName(Request &) override;
+};
+
+
+bool TgAuthHandler::isRequestPermitted(Request &req) {
+	return true;
+}
+
+int TgAuthHandler::onTranslateName(Request &req) {
+	StringStream message;
+	for (auto &it : req.getParsedQueryArgs().asDict()) {
+		if (!message.empty()) {
+			message << "\n";
+		}
+		message << it.first << "=" << it.second.getString();
+	}
+
+	auto secret = string::Sha256().update(TG_BOT).final();
+	auto result = string::Sha256::hmac(message.weak(), secret);
+
+	data::Value tmp(req.getParsedQueryArgs());
+	tmp.setString(base16::encode(result), "secret");
+	output::writeData(req, tmp);
+	return DONE;
+}
+
 NS_SA_EXT_END(trubach)

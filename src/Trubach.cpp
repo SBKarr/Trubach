@@ -187,6 +187,7 @@ void TrubachComponent::onChildInit(Server &serv) {
 	serv.addHandler("/admin/", new AdminHandlerMap);
 
 	serv.addHandler(toString("/tg/", TG_BOT), SA_HANDLER(TgBotHandler));
+	serv.addHandler("/tg_auth", SA_HANDLER(TgAuthHandler));
 	serv.addHandler(toString("/hub/", HUB_SECRET), SA_HANDLER(HubHandler));
 
 	serv.addResourceHandler("/api/v1/sections/", _sections);
